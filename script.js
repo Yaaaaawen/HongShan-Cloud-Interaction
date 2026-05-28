@@ -54,12 +54,7 @@ const survivalQuestions = [
 
 const questionSets = { sector: sectorQuestions, panel: panelQuestions, survival: survivalQuestions };
 
-const seedPlayers = [
-  { id: "seed-1", name: "Chen", office: "北京", baseScore: 245 },
-  { id: "seed-2", name: "Lina", office: "上海/武汉", baseScore: 205 },
-  { id: "seed-3", name: "Mark", office: "香港/深圳/新加坡/东京/伦敦", baseScore: 175 },
-  { id: "seed-4", name: "Iris", office: "北京", baseScore: 130 }
-];
+const seedPlayers = [];
 
 let metricMode = "score";
 let backendOnline = false;
@@ -89,10 +84,14 @@ function defaultUser(user) {
   };
 }
 
+function isRealUser(user) {
+  return user?.id && !user.id.startsWith("seed-");
+}
+
 function loadState() {
   const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
   if (saved) {
-    saved.users = saved.users.map(normalizeUser);
+    saved.users = saved.users.filter(isRealUser).map(normalizeUser);
     saved.admin = normalizeAdmin(saved.admin);
     return saved;
   }
@@ -104,7 +103,7 @@ function loadState() {
 
 function normalizeState(nextState) {
   return {
-    users: Array.isArray(nextState?.users) ? nextState.users.map(normalizeUser) : seedPlayers.map(defaultUser),
+    users: Array.isArray(nextState?.users) ? nextState.users.filter(isRealUser).map(normalizeUser) : [],
     admin: normalizeAdmin(nextState?.admin)
   };
 }
@@ -134,6 +133,25 @@ function normalizeAdmin(admin = {}) {
       ...(admin.released || {})
     }
   };
+}
+
+function resetUserForNewRound(user) {
+  return defaultUser({
+    id: user.id,
+    name: user.name,
+    office: user.office || offices[0],
+    baseScore: 0
+  });
+}
+
+function resetRoundState() {
+  const currentUsers = state.users.filter(isRealUser);
+  state = {
+    users: currentUsers.map(resetUserForNewRound),
+    admin: normalizeAdmin()
+  };
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  saveState();
 }
 
 function saveState() {
@@ -619,12 +637,16 @@ document.getElementById("resetMeButton").addEventListener("click", () => {
   render();
 });
 document.getElementById("resetAllButton").addEventListener("click", () => {
-  localStorage.removeItem(STORE_KEY);
-  localStorage.removeItem(ME_KEY);
-  state = loadState();
-  currentUserId = null;
+  document.getElementById("resetModal").hidden = false;
+});
+document.getElementById("cancelResetButton").addEventListener("click", () => {
+  document.getElementById("resetModal").hidden = true;
+});
+document.getElementById("confirmResetButton").addEventListener("click", async () => {
+  document.getElementById("resetModal").hidden = true;
+  resetRoundState();
   switchPanel("dashboardPanel");
-  resetServerState();
+  await resetServerState();
   render();
 });
 
@@ -687,7 +709,11 @@ async function pushState() {
 async function resetServerState() {
   if (!apiResetUrl || !isAdminMode) return;
   try {
-    await fetch(apiResetUrl, { method: "POST" });
+    await fetch(apiResetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state })
+    });
   } catch (error) {
     backendOnline = false;
   }

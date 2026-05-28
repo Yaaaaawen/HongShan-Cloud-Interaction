@@ -238,7 +238,8 @@ select:focus {
 .section-title button,
 .word-pill,
 .answer-button,
-.release-row button {
+.release-row button,
+.modal-actions button {
   min-height: 42px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -622,6 +623,47 @@ select:focus {
 
 .stage-switch-row {
   grid-template-columns: minmax(160px, 1fr) auto;
+}
+
+.danger-action {
+  border-color: rgba(207, 63, 63, 0.5) !important;
+  background: #cf3f3f !important;
+  color: #fff !important;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: rgba(9, 17, 31, 0.42);
+  padding: 20px;
+}
+
+.confirm-modal {
+  width: min(480px, 100%);
+  border: 1px solid rgba(217, 222, 232, 0.9);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(23, 32, 51, 0.28);
+  padding: 26px;
+}
+
+.confirm-modal h2 {
+  margin-bottom: 12px;
+}
+
+.confirm-modal p:not(.eyebrow) {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
 }
 
 .admin-mode #adminStageList {

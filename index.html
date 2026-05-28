@@ -161,7 +161,7 @@
                   <p class="eyebrow">ADMIN</p>
                   <h2>现场控场台</h2>
                 </div>
-                <button id="resetAllButton" type="button">清空演示数据</button>
+                <button id="resetAllButton" class="danger-action" type="button">重新开始本轮</button>
               </div>
               <div class="admin-grid">
                 <article>
@@ -203,7 +203,19 @@
       </main>
     </div>
 
+    <div id="resetModal" class="modal-backdrop" hidden>
+      <section class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="resetModalTitle">
+        <p class="eyebrow">DANGER ZONE</p>
+        <h2 id="resetModalTitle">确定重新开始？</h2>
+        <p>所有用户会回到注册后的初始界面，答题记录和积分将清零，STAFF 发布状态也会重置。</p>
+        <div class="modal-actions">
+          <button id="confirmResetButton" class="danger-action" type="button">确定从新开始</button>
+          <button id="cancelResetButton" type="button">取消</button>
+        </div>
+      </section>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./script.js?v=supabase-sync-20260528-1"></script>
+    <script src="./script.js?v=reset-round-20260528-1"></script>
   </body>
 </html>

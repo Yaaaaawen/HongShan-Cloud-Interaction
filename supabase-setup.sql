@@ -78,13 +78,8 @@ values (
 )
 on conflict (id) do nothing;
 
-insert into public.hongshan_users (id, payload)
-values
-  ('seed-1', '{"id":"seed-1","name":"Chen","office":"北京","baseScore":245,"bingo":{"selected":[],"submitted":false},"drafts":{},"submissions":{},"survivalAlive":true}'::jsonb),
-  ('seed-2', '{"id":"seed-2","name":"Lina","office":"上海/武汉","baseScore":205,"bingo":{"selected":[],"submitted":false},"drafts":{},"submissions":{},"survivalAlive":true}'::jsonb),
-  ('seed-3', '{"id":"seed-3","name":"Mark","office":"香港/深圳/新加坡/东京/伦敦","baseScore":175,"bingo":{"selected":[],"submitted":false},"drafts":{},"submissions":{},"survivalAlive":true}'::jsonb),
-  ('seed-4', '{"id":"seed-4","name":"Iris","office":"北京","baseScore":130,"bingo":{"selected":[],"submitted":false},"drafts":{},"submissions":{},"survivalAlive":true}'::jsonb)
-on conflict (id) do nothing;
+delete from public.hongshan_users
+where id like 'seed-%';
 
 do $$
 begin

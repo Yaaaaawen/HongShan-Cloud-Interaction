@@ -19,12 +19,7 @@ const questionIds = [
   "survival-1", "survival-2", "survival-3", "survival-4", "survival-5"
 ];
 
-const seedPlayers = [
-  { id: "seed-1", name: "Chen", office: "北京", baseScore: 245 },
-  { id: "seed-2", name: "Lina", office: "上海/武汉", baseScore: 205 },
-  { id: "seed-3", name: "Mark", office: "香港/深圳/新加坡/东京/伦敦", baseScore: 175 },
-  { id: "seed-4", name: "Iris", office: "北京", baseScore: 130 }
-];
+const seedPlayers = [];
 
 let version = Date.now();
 let state = loadState();
@@ -41,7 +36,7 @@ function defaultUser(user) {
 
 function defaultState() {
   return {
-    users: seedPlayers.map(defaultUser),
+    users: [],
     admin: {
       gameOpen: { bingo: true, sector: false, panel: false, survival: false },
       bingoRevealed: Object.fromEntries(bingoCandidates.map((word) => [word, false])),
@@ -68,6 +63,7 @@ function mergeUserState(incoming, userId) {
   const users = new Map(state.users.map((user) => [user.id, user]));
   incoming.users.forEach((user) => {
     if (!user?.id) return;
+    if (user.id.startsWith("seed-")) return;
     if (!userId || user.id === userId || !users.has(user.id)) {
       users.set(user.id, user);
     }
@@ -157,7 +153,12 @@ const server = http.createServer(async (request, response) => {
     return;
   }
   if (url.pathname === "/api/reset" && request.method === "POST") {
-    state = defaultState();
+    try {
+      const payload = JSON.parse(await readBody(request) || "{}");
+      state = payload.state || defaultState();
+    } catch {
+      state = defaultState();
+    }
     persistState();
     sendJson(response, 200, { ok: true, version });
     return;
