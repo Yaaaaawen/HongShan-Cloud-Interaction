@@ -3,6 +3,9 @@ const ME_KEY = "live-play-arena-current-user";
 const isAdminMode = new URLSearchParams(location.search).has("admin");
 const isScreenMode = new URLSearchParams(location.search).has("screen");
 const offices = ["北京", "上海/武汉", "香港/深圳/新加坡/东京/伦敦"];
+const hasLocalSyncServer = location.protocol.startsWith("http") && !location.hostname.endsWith("github.io");
+const apiStateUrl = hasLocalSyncServer ? "/api/state" : "";
+const apiResetUrl = hasLocalSyncServer ? "/api/reset" : "";
 
 const gameMeta = {
   bingo: { label: "Bingo", panel: "bingoPanel", order: 1 },
@@ -57,6 +60,9 @@ const seedPlayers = [
 ];
 
 let metricMode = "score";
+let backendOnline = false;
+let lastServerVersion = 0;
+let isPullingState = false;
 
 let state = loadState();
 let currentUserId = localStorage.getItem(ME_KEY);
@@ -90,6 +96,13 @@ function loadState() {
   };
 }
 
+function normalizeState(nextState) {
+  return {
+    users: Array.isArray(nextState?.users) ? nextState.users.map(normalizeUser) : seedPlayers.map(defaultUser),
+    admin: normalizeAdmin(nextState?.admin)
+  };
+}
+
 function normalizeUser(user) {
   return {
     id: user.id,
@@ -119,6 +132,7 @@ function normalizeAdmin(admin = {}) {
 
 function saveState() {
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  if (!isPullingState) pushState();
 }
 
 function getCurrentUser() {
@@ -603,6 +617,7 @@ document.getElementById("resetAllButton").addEventListener("click", () => {
   state = loadState();
   currentUserId = null;
   switchPanel("dashboardPanel");
+  resetServerState();
   render();
 });
 
@@ -621,4 +636,55 @@ window.setInterval(() => {
   if (isScreenMode) renderScreen();
 }, 3000);
 
+window.setInterval(() => {
+  pullState();
+}, 1000);
+
+async function pullState() {
+  if (!apiStateUrl) return;
+  try {
+    const response = await fetch(apiStateUrl, { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = await response.json();
+    backendOnline = true;
+    if (!payload?.state || payload.version === lastServerVersion) return;
+    lastServerVersion = payload.version || Date.now();
+    isPullingState = true;
+    state = normalizeState(payload.state);
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    isPullingState = false;
+    render();
+  } catch (error) {
+    backendOnline = false;
+  }
+}
+
+async function pushState() {
+  if (!apiStateUrl || isScreenMode) return;
+  try {
+    const role = isAdminMode ? "admin" : "user";
+    const response = await fetch(`${apiStateUrl}?role=${role}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state, userId: currentUserId })
+    });
+    if (!response.ok) return;
+    const payload = await response.json();
+    backendOnline = true;
+    lastServerVersion = payload.version || lastServerVersion;
+  } catch (error) {
+    backendOnline = false;
+  }
+}
+
+async function resetServerState() {
+  if (!apiResetUrl || !isAdminMode) return;
+  try {
+    await fetch(apiResetUrl, { method: "POST" });
+  } catch (error) {
+    backendOnline = false;
+  }
+}
+
+pullState();
 render();
