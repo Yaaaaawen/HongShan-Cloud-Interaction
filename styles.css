@@ -267,12 +267,21 @@ select:focus {
 }
 
 .admin-mode .content-stack {
+  width: min(1280px, 100%);
   max-width: 1280px;
   margin: 0 auto;
 }
 
 .admin-mode .panel {
   padding: clamp(18px, 3vw, 34px);
+}
+
+.admin-mode .game-view {
+  display: block;
+}
+
+.admin-mode #adminPanel {
+  width: 100%;
 }
 
 .content-stack {
@@ -372,11 +381,15 @@ select:focus {
 }
 
 .admin-mode .admin-grid {
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
 .admin-mode .admin-grid article {
   min-width: 0;
+  width: 100%;
+  overflow: hidden;
 }
 
 .word-cloud {
@@ -393,7 +406,7 @@ select:focus {
 
 .admin-mode .word-cloud.compact {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
 }
 
 .word-pill.correct {
@@ -612,6 +625,7 @@ select:focus {
 }
 
 .admin-mode #adminStageList {
+  display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
