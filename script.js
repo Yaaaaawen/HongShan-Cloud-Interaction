@@ -1,5 +1,7 @@
 const STORE_KEY = "live-play-arena-state-v3";
 const ME_KEY = "live-play-arena-current-user";
+const SUPABASE_URL = "https://gqonejvsckzlbbubeoqy.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_CuI1xNMOAsBjEL02prrB0A_UlX31xsW";
 const isAdminMode = new URLSearchParams(location.search).has("admin");
 const isScreenMode = new URLSearchParams(location.search).has("screen");
 const offices = ["北京", "上海/武汉", "香港/深圳/新加坡/东京/伦敦"];
@@ -63,6 +65,10 @@ let metricMode = "score";
 let backendOnline = false;
 let lastServerVersion = 0;
 let isPullingState = false;
+let cloudClient = null;
+let cloudReady = false;
+let cloudPulling = false;
+let cloudSignature = "";
 
 let state = loadState();
 let currentUserId = localStorage.getItem(ME_KEY);
@@ -133,6 +139,7 @@ function normalizeAdmin(admin = {}) {
 function saveState() {
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
   if (!isPullingState) pushState();
+  if (!isPullingState && !cloudPulling) pushCloudState();
 }
 
 function getCurrentUser() {
@@ -686,5 +693,81 @@ async function resetServerState() {
   }
 }
 
+function initCloudSync() {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !window.supabase) return;
+  cloudClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  cloudReady = true;
+  pullCloudState();
+  cloudClient
+    .channel("hongshan-cloud-interaction")
+    .on("postgres_changes", { event: "*", schema: "public", table: "hongshan_admin" }, pullCloudState)
+    .on("postgres_changes", { event: "*", schema: "public", table: "hongshan_users" }, pullCloudState)
+    .subscribe();
+}
+
+function stateSignature(nextState) {
+  return JSON.stringify({
+    admin: nextState.admin,
+    users: nextState.users.map((user) => [user.id, user.office, user.bingo, user.submissions, user.survivalAlive, user.baseScore])
+  });
+}
+
+async function pullCloudState() {
+  if (!cloudReady || cloudPulling) return;
+  cloudPulling = true;
+  try {
+    const [{ data: adminRows, error: adminError }, { data: userRows, error: usersError }] = await Promise.all([
+      cloudClient.from("hongshan_admin").select("admin").eq("id", "main").limit(1),
+      cloudClient.from("hongshan_users").select("id,payload")
+    ]);
+    if (adminError || usersError) throw adminError || usersError;
+    const nextState = normalizeState({
+      admin: adminRows?.[0]?.admin || state.admin,
+      users: userRows?.length ? userRows.map((row) => row.payload) : state.users
+    });
+    const signature = stateSignature(nextState);
+    if (signature !== cloudSignature) {
+      cloudSignature = signature;
+      isPullingState = true;
+      state = nextState;
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      isPullingState = false;
+      render();
+    }
+  } catch (error) {
+    console.warn("Supabase sync unavailable", error);
+  } finally {
+    cloudPulling = false;
+  }
+}
+
+async function pushCloudState() {
+  if (!cloudReady) return;
+  try {
+    if (isAdminMode) {
+      await cloudClient.from("hongshan_admin").upsert({
+        id: "main",
+        admin: state.admin,
+        updated_at: new Date().toISOString()
+      });
+      await cloudClient.from("hongshan_users").upsert(
+        state.users.map((user) => ({ id: user.id, payload: user, updated_at: new Date().toISOString() }))
+      );
+    } else if (currentUserId) {
+      const user = getCurrentUser();
+      if (user) {
+        await cloudClient.from("hongshan_users").upsert({
+          id: user.id,
+          payload: user,
+          updated_at: new Date().toISOString()
+        });
+      }
+    }
+  } catch (error) {
+    console.warn("Supabase push unavailable", error);
+  }
+}
+
+initCloudSync();
 pullState();
 render();
