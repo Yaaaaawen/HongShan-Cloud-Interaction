@@ -56,7 +56,11 @@ insert into public.hongshan_admin (id, admin)
 values (
   'main',
   '{
+    "roundId": "main",
     "gameOpen": { "bingo": true, "sector": false, "panel": false, "survival": false },
+    "gameEnded": { "bingo": false, "sector": false, "panel": false, "survival": false },
+    "answersVisible": { "sector": false, "panel": false, "survival": false },
+    "bingoDeadline": null,
     "bingoRevealed": {
       "增长": false, "客户": false, "协同": false, "创新": false, "AI": false,
       "全球化": false, "合规": false, "利润": false, "现金流": false, "品牌": false,

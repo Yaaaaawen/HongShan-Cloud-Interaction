@@ -64,6 +64,9 @@ let cloudClient = null;
 let cloudReady = false;
 let cloudPulling = false;
 let cloudSignature = "";
+let localWriteUntil = 0;
+let pendingRegistration = null;
+let clearCloudUsersOnNextPush = false;
 
 let state = loadState();
 let currentUserId = localStorage.getItem(ME_KEY);
@@ -77,6 +80,7 @@ function defaultUser(user) {
     ...user,
     office: user.office || offices[0],
     baseScore: user.baseScore || 0,
+    roundId: user.roundId || "main",
     bingo: { selected: [], submitted: false },
     drafts: {},
     submissions: {},
@@ -86,6 +90,10 @@ function defaultUser(user) {
 
 function isRealUser(user) {
   return user?.id && !user.id.startsWith("seed-");
+}
+
+function isActiveUser(user) {
+  return isRealUser(user) && (user.roundId || "main") === state.admin.roundId;
 }
 
 function loadState() {
@@ -114,6 +122,7 @@ function normalizeUser(user) {
     name: user.name,
     office: user.office || offices[0],
     baseScore: user.baseScore || 0,
+    roundId: user.roundId || "main",
     bingo: {
       selected: user.bingo?.selected || [],
       submitted: Boolean(user.bingo?.submitted || user.bingo?.locked)
@@ -126,7 +135,11 @@ function normalizeUser(user) {
 
 function normalizeAdmin(admin = {}) {
   return {
+    roundId: admin.roundId || "main",
     gameOpen: { bingo: true, sector: false, panel: false, survival: false, ...(admin.gameOpen || {}) },
+    gameEnded: { bingo: false, sector: false, panel: false, survival: false, ...(admin.gameEnded || {}) },
+    answersVisible: { sector: false, panel: false, survival: false, ...(admin.answersVisible || {}) },
+    bingoDeadline: admin.bingoDeadline || null,
     bingoRevealed: { ...Object.fromEntries(bingoCandidates.map((word) => [word, false])), ...(admin.bingoRevealed || {}) },
     released: {
       ...Object.fromEntries([...sectorQuestions, ...panelQuestions, ...survivalQuestions].map((item) => [item.id, false])),
@@ -140,39 +153,56 @@ function resetUserForNewRound(user) {
     id: user.id,
     name: user.name,
     office: user.office || offices[0],
-    baseScore: 0
+    baseScore: 0,
+    roundId: state.admin.roundId
   });
 }
 
 function resetRoundState() {
-  const currentUsers = state.users.filter(isRealUser);
+  const roundId = state.admin.roundId;
+  const currentUsers = state.users.filter(isActiveUser);
   state = {
     users: currentUsers.map(resetUserForNewRound),
-    admin: normalizeAdmin()
+    admin: normalizeAdmin({ roundId })
   };
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  saveState();
+}
+
+function clearAllState() {
+  clearCloudUsersOnNextPush = true;
+  state = {
+    users: [],
+    admin: normalizeAdmin({ roundId: `round-${Date.now()}` })
+  };
+  currentUserId = null;
+  localStorage.removeItem(ME_KEY);
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
   saveState();
 }
 
 function saveState() {
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  localWriteUntil = Date.now() + 5000;
+  cloudSignature = stateSignature(state);
   if (!isPullingState) pushState();
   if (!isPullingState && !cloudPulling) pushCloudState();
 }
 
 function getCurrentUser() {
-  return state.users.find((user) => user.id === currentUserId);
+  return state.users.find((user) => user.id === currentUserId && isActiveUser(user));
 }
 
 function createUser(name, office) {
   const id = `user-${office}-${name.trim().toLowerCase()}`;
   let user = state.users.find((item) => item.id === id);
   if (!user) {
-    user = defaultUser({ id, name: name.trim(), office });
+    user = defaultUser({ id, name: name.trim(), office, roundId: state.admin.roundId });
     state.users.push(user);
   } else {
     user.name = name.trim();
     user.office = office;
+    user.roundId = state.admin.roundId;
   }
   currentUserId = id;
   localStorage.setItem(ME_KEY, id);
@@ -233,7 +263,7 @@ function totalScore(user) {
 }
 
 function rankUsers() {
-  return [...state.users].sort((a, b) => totalScore(b) - totalScore(a) || a.name.localeCompare(b.name));
+  return state.users.filter(isActiveUser).sort((a, b) => totalScore(b) - totalScore(a) || a.name.localeCompare(b.name));
 }
 
 function userRank(userId) {
@@ -268,6 +298,10 @@ function toggleBingoSelection(word) {
 function submitBingo() {
   const user = getCurrentUser();
   if (!user || user.bingo.selected.length !== 9) return;
+  if (isBingoExpired()) {
+    renderBingo();
+    return;
+  }
   user.bingo.submitted = true;
   saveState();
   render();
@@ -310,6 +344,7 @@ function switchPanel(panelId) {
 function render() {
   renderQr();
   renderMode();
+  renderGameLabels();
   if (isScreenMode) {
     renderScreen();
     return;
@@ -329,6 +364,22 @@ function render() {
   renderQuiz("sectorQuiz", "sector", sectorQuestions);
   renderQuiz("panelQuestions", "panel", panelQuestions);
   renderQuiz("survivalQuiz", "survival", survivalQuestions);
+}
+
+function renderGameLabels() {
+  Object.entries(gameMeta).forEach(([game, meta]) => {
+    const title = document.getElementById(`${game}Title`);
+    if (title) title.textContent = `${titleBase(game)}${state.admin.gameEnded[game] ? "（已结束）" : ""}`;
+  });
+}
+
+function titleBase(game) {
+  return {
+    bingo: "老板演讲 Bingo",
+    sector: "Sector 快问快答",
+    panel: "新晋升 Panel 真假判断",
+    survival: "知识问答大逃杀"
+  }[game];
 }
 
 function renderMode() {
@@ -393,12 +444,13 @@ function renderBingo() {
   words.innerHTML = "";
   grid.innerHTML = "";
 
+  const expired = isBingoExpired();
   bingoCandidates.forEach((word) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "word-pill";
     button.textContent = word;
-    button.disabled = user.bingo.submitted || !isGameAvailable("bingo");
+    button.disabled = user.bingo.submitted || !isGameAvailable("bingo") || state.admin.gameEnded.bingo || expired;
     button.classList.toggle("selected", user.bingo.selected.includes(word));
     button.addEventListener("click", () => toggleBingoSelection(word));
     words.append(button);
@@ -416,12 +468,28 @@ function renderBingo() {
   }
 
   const hitCount = user.bingo.selected.filter((word) => state.admin.bingoRevealed[word]).length;
-  status.textContent = user.bingo.submitted ? `已提交，后台已发布 ${hitCount}/9` : `已选择 ${user.bingo.selected.length}/9`;
+  status.textContent = user.bingo.submitted
+    ? `已提交，后台已发布 ${hitCount}/9`
+    : expired
+      ? "倒计时已结束，提交无效"
+      : `${bingoCountdownText()} · 已选择 ${user.bingo.selected.length}/9`;
   document.getElementById("lockBingoButton").disabled =
-    user.bingo.submitted || user.bingo.selected.length !== 9 || !isGameAvailable("bingo");
+    user.bingo.submitted || user.bingo.selected.length !== 9 || !isGameAvailable("bingo") || state.admin.gameEnded.bingo || expired;
   document.getElementById("bingoResult").textContent = user.bingo.submitted
     ? `Bingo 已公布积分：${getBingoScore(user)}`
     : "提交后等待 STAFF 逐词发布积分";
+}
+
+function isBingoExpired() {
+  return Boolean(state.admin.bingoDeadline && Date.now() > Number(state.admin.bingoDeadline));
+}
+
+function bingoCountdownText() {
+  if (!state.admin.bingoDeadline) return "等待 STAFF 开始倒计时";
+  const remain = Math.max(0, Number(state.admin.bingoDeadline) - Date.now());
+  const minutes = String(Math.floor(remain / 60000)).padStart(2, "0");
+  const seconds = String(Math.floor((remain % 60000) / 1000)).padStart(2, "0");
+  return `剩余 ${minutes}:${seconds}`;
 }
 
 function bingoLines(user) {
@@ -464,14 +532,15 @@ function renderQuiz(containerId, game, questions) {
       button.type = "button";
       button.className = "answer-button";
       button.textContent = option;
-      button.disabled = questionSubmitted || !isGameAvailable(game) || (game === "survival" && !user.survivalAlive);
+      button.disabled = questionSubmitted || !isGameAvailable(game) || state.admin.gameEnded[game] || (game === "survival" && !user.survivalAlive);
       button.classList.toggle("selected", choice === option && !questionSubmitted);
-      if (questionSubmitted && choice === option) button.classList.add(option === question.answer ? "correct" : "incorrect");
+      if (state.admin.answersVisible[game] && option === question.answer) button.classList.add("correct");
       button.addEventListener("click", () => setDraftAnswer(game, question.id, option));
       row.append(button);
     });
     if (questionSubmitted) row.append(note("已提交"));
     if (!questionSubmitted && choice) row.append(note("已选择，可修改"));
+    if (state.admin.answersVisible[game]) row.append(note(`答案：${question.answer}`));
     container.append(card);
   });
   renderSubmitState(game, releasedQuestions);
@@ -484,7 +553,7 @@ function renderSubmitState(game, questions) {
   const submitted = user.submissions[game];
   const pendingQuestions = questions.filter((question) => !submitted?.answers?.[question.id]);
   const ready = pendingQuestions.length > 0 && pendingQuestions.every((question) => user.drafts[question.id]);
-  button.disabled = !ready || !isGameAvailable(game) || (game === "survival" && !user.survivalAlive);
+  button.disabled = !ready || !isGameAvailable(game) || state.admin.gameEnded[game] || (game === "survival" && !user.survivalAlive);
   const submittedCount = questions.length - pendingQuestions.length;
   result.textContent = submittedCount > 0
     ? `已提交 ${submittedCount}/${questions.length} 题，本环节得分：${getQuizScore(user, game)}`
@@ -519,9 +588,14 @@ function renderAdmin() {
   const stageBox = document.getElementById("adminStageList");
   const wordBox = document.getElementById("adminBingoWords");
   const releaseBox = document.getElementById("adminReleaseList");
+  const statsBox = document.getElementById("adminStats");
   stageBox.innerHTML = "";
   wordBox.innerHTML = "";
   releaseBox.innerHTML = "";
+  statsBox.innerHTML = "";
+
+  renderAdminStats(statsBox);
+  document.getElementById("adminBingoTimer").textContent = bingoCountdownText();
 
   Object.entries(gameMeta).forEach(([game, meta]) => {
     const row = document.createElement("div");
@@ -535,7 +609,15 @@ function renderAdmin() {
       saveState();
       render();
     });
-    row.append(label);
+    const endButton = document.createElement("button");
+    endButton.type = "button";
+    endButton.textContent = state.admin.gameEnded[game] ? "恢复本游戏" : "结束本游戏";
+    endButton.addEventListener("click", () => {
+      state.admin.gameEnded[game] = !state.admin.gameEnded[game];
+      saveState();
+      render();
+    });
+    row.append(label, endButton);
     stageBox.append(row);
   });
 
@@ -553,29 +635,71 @@ function renderAdmin() {
     wordBox.append(button);
   });
 
-  [...sectorQuestions, ...panelQuestions, ...survivalQuestions].forEach((question) => {
-    const row = document.createElement("div");
-    row.className = "release-row";
-    row.innerHTML = `<span>${question.group} · ${question.text}</span>`;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = isReleased(question.id) ? "已放行" : "放行";
-    button.addEventListener("click", () => {
-      state.admin.released[question.id] = !state.admin.released[question.id];
+  Object.entries(questionSets).forEach(([game, questions]) => {
+    const group = document.createElement("section");
+    group.className = "question-admin-group";
+    const heading = document.createElement("div");
+    heading.className = "admin-group-heading";
+    heading.innerHTML = `<h3>${gameMeta[game].label}</h3>`;
+    const revealButton = document.createElement("button");
+    revealButton.type = "button";
+    revealButton.textContent = state.admin.answersVisible[game] ? "隐藏答案" : "公布答案";
+    revealButton.addEventListener("click", () => {
+      state.admin.answersVisible[game] = !state.admin.answersVisible[game];
       saveState();
       render();
     });
-    row.append(button);
-    releaseBox.append(row);
+    heading.append(revealButton);
+    group.append(heading);
+    questions.forEach((question) => {
+      const row = document.createElement("div");
+      row.className = "release-row";
+      row.innerHTML = `<span>${question.group} · ${question.text}<br><span class="answer-reveal">答案：${question.answer}</span></span>`;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = isReleased(question.id) ? "已放行" : "放行";
+      button.addEventListener("click", () => {
+        state.admin.released[question.id] = !state.admin.released[question.id];
+        saveState();
+        render();
+      });
+      row.append(button);
+      group.append(row);
+    });
+    releaseBox.append(group);
   });
+}
+
+function renderAdminStats(statsBox) {
+  const realUsers = state.users.filter(isActiveUser);
+  const stats = [
+    ["实时注册人数", realUsers.length],
+    ["Bingo 提交人数", realUsers.filter((user) => user.bingo.submitted).length],
+    ["快问快答提交", submittedAnswerCount("sector")],
+    ["真假判断提交", submittedAnswerCount("panel")],
+    ["知识问答提交", submittedAnswerCount("survival")]
+  ];
+  stats.forEach(([label, value]) => {
+    const card = document.createElement("div");
+    card.className = "admin-stat-card";
+    card.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
+    statsBox.append(card);
+  });
+}
+
+function submittedAnswerCount(game) {
+  return state.users.filter(isActiveUser).reduce((sum, user) => sum + Object.keys(user.submissions[game]?.answers || {}).length, 0);
 }
 
 function renderQr() {
   const url = location.href.split("?")[0].split("#")[0];
   const joinUrl = url;
-  document.getElementById("joinUrl").textContent = joinUrl;
-  document.getElementById("qrImage").src =
-    `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=${encodeURIComponent(joinUrl)}`;
+  const joinUrlNode = document.getElementById("joinUrl");
+  const qrImage = document.getElementById("qrImage");
+  if (joinUrlNode) joinUrlNode.textContent = joinUrl;
+  if (qrImage) {
+    qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=${encodeURIComponent(joinUrl)}`;
+  }
 }
 
 function leaderboardRow(user, index) {
@@ -587,7 +711,7 @@ function leaderboardRow(user, index) {
 
 function officeAverages() {
   return offices.map((office) => {
-    const users = state.users.filter((user) => user.office === office);
+    const users = state.users.filter((user) => isActiveUser(user) && user.office === office);
     const average = users.length ? Math.round(users.reduce((sum, user) => sum + totalScore(user), 0) / users.length) : 0;
     return { office, average };
   });
@@ -620,7 +744,26 @@ function capitalize(value) {
 
 document.getElementById("joinForm").addEventListener("submit", (event) => {
   event.preventDefault();
-  createUser(document.getElementById("nameInput").value, document.getElementById("officeInput").value);
+  pendingRegistration = {
+    name: document.getElementById("nameInput").value.trim(),
+    office: document.getElementById("officeInput").value
+  };
+  if (!pendingRegistration.name || !pendingRegistration.office) return;
+  document.getElementById("registerConfirmText").textContent =
+    `姓名：${pendingRegistration.name}；办公室：${pendingRegistration.office}`;
+  document.getElementById("registerModal").hidden = false;
+});
+
+document.getElementById("cancelRegisterButton").addEventListener("click", () => {
+  pendingRegistration = null;
+  document.getElementById("registerModal").hidden = true;
+});
+
+document.getElementById("confirmRegisterButton").addEventListener("click", () => {
+  if (!pendingRegistration) return;
+  createUser(pendingRegistration.name, pendingRegistration.office);
+  pendingRegistration = null;
+  document.getElementById("registerModal").hidden = true;
 });
 
 document.querySelectorAll(".nav-button").forEach((button) => {
@@ -631,11 +774,6 @@ document.getElementById("lockBingoButton").addEventListener("click", submitBingo
 document.getElementById("submitSectorButton").addEventListener("click", () => submitGame("sector"));
 document.getElementById("submitPanelButton").addEventListener("click", () => submitGame("panel"));
 document.getElementById("submitSurvivalButton").addEventListener("click", () => submitGame("survival"));
-document.getElementById("resetMeButton").addEventListener("click", () => {
-  localStorage.removeItem(ME_KEY);
-  currentUserId = null;
-  render();
-});
 document.getElementById("resetAllButton").addEventListener("click", () => {
   document.getElementById("resetModal").hidden = false;
 });
@@ -647,6 +785,20 @@ document.getElementById("confirmResetButton").addEventListener("click", async ()
   resetRoundState();
   switchPanel("dashboardPanel");
   await resetServerState();
+  render();
+});
+document.getElementById("clearAllButton").addEventListener("click", async () => {
+  document.getElementById("resetModal").hidden = true;
+  clearAllState();
+  switchPanel("dashboardPanel");
+  await resetServerState();
+  render();
+});
+
+document.getElementById("startBingoTimerButton").addEventListener("click", () => {
+  const minutes = Math.max(1, Number(document.getElementById("bingoMinutesInput").value || 1));
+  state.admin.bingoDeadline = Date.now() + minutes * 60 * 1000;
+  saveState();
   render();
 });
 
@@ -663,6 +815,7 @@ window.addEventListener("storage", () => {
 
 window.setInterval(() => {
   if (isScreenMode) renderScreen();
+  if (isAdminMode || document.getElementById("bingoPanel")?.classList.contains("active-panel")) render();
 }, 3000);
 
 window.setInterval(() => {
@@ -740,6 +893,7 @@ function stateSignature(nextState) {
 
 async function pullCloudState() {
   if (!cloudReady || cloudPulling) return;
+  if (Date.now() < localWriteUntil) return;
   cloudPulling = true;
   try {
     const [{ data: adminRows, error: adminError }, { data: userRows, error: usersError }] = await Promise.all([
@@ -776,9 +930,15 @@ async function pushCloudState() {
         admin: state.admin,
         updated_at: new Date().toISOString()
       });
-      await cloudClient.from("hongshan_users").upsert(
-        state.users.map((user) => ({ id: user.id, payload: user, updated_at: new Date().toISOString() }))
-      );
+      if (clearCloudUsersOnNextPush) {
+        await cloudClient.from("hongshan_users").delete().neq("id", "");
+        clearCloudUsersOnNextPush = false;
+      }
+      if (state.users.length) {
+        await cloudClient.from("hongshan_users").upsert(
+          state.users.map((user) => ({ id: user.id, payload: user, updated_at: new Date().toISOString() }))
+        );
+      }
     } else if (currentUserId) {
       const user = getCurrentUser();
       if (user) {
@@ -789,6 +949,7 @@ async function pushCloudState() {
         });
       }
     }
+    cloudSignature = stateSignature(state);
   } catch (error) {
     console.warn("Supabase push unavailable", error);
   }

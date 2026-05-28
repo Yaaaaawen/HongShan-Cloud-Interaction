@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HongShan Cloud Interaction</title>
-    <link rel="stylesheet" href="./styles.css?v=staff-layout-20260528-2" />
+    <link rel="stylesheet" href="./styles.css?v=event-polish-20260528-1" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">HONGSHAN CLOUD</p>
-          <h1>HongShan Cloud Interaction</h1>
+          <p class="eyebrow">2026 HONGSHAN CLOUD OFFSITE</p>
+          <h1>HongShan Interactions</h1>
         </div>
         <div class="user-strip" aria-live="polite">
           <span id="headerName">未登录</span>
@@ -22,9 +22,7 @@
       <main>
         <section id="loginView" class="login-view">
           <div class="hero-copy">
-            <p class="eyebrow">SCAN TO JOIN</p>
-            <h2>扫码入场，积分随玩随存</h2>
-            <p>观众输入姓名即可进入游戏大厅；再次打开会自动恢复个人积分、Bingo 选择和淘汰状态。</p>
+            <h2>HongShan Interactions</h2>
             <form id="joinForm" class="join-form">
               <label>
                 <span>姓名</span>
@@ -42,10 +40,6 @@
               <button type="submit">进入游戏</button>
             </form>
           </div>
-          <aside class="qr-panel">
-            <img id="qrImage" alt="入场二维码" />
-            <p id="joinUrl"></p>
-          </aside>
         </section>
 
         <section id="gameView" class="game-view" hidden>
@@ -59,6 +53,10 @@
 
           <section class="content-stack">
             <section id="dashboardPanel" class="panel active-panel">
+              <section class="game-instructions">
+                <h2>游戏说明</h2>
+                <p>请根据 STAFF 现场开放的游戏和题目作答。提交前可以修改答案，提交后等待现场公布结果。</p>
+              </section>
               <div class="summary-grid">
                 <article class="metric-card">
                   <div class="metric-heading">
@@ -82,7 +80,6 @@
               <div class="leaderboard-card">
                 <div class="section-title">
                   <h2>大排名</h2>
-                  <button id="resetMeButton" type="button">重新登录</button>
                 </div>
                 <div id="leaderboardList" class="leaderboard-list"></div>
               </div>
@@ -92,7 +89,8 @@
               <div class="section-title">
                 <div>
                   <p class="eyebrow">GAME 01</p>
-                  <h2>老板演讲 Bingo</h2>
+                  <h2 id="bingoTitle">老板演讲 Bingo</h2>
+                  <p class="rule-text">游戏规则：选择 9 个词组成九宫格，全对有额外奖励。倒计时结束后提交无效。</p>
                 </div>
                 <span id="bingoStatus" class="status-pill">请选择 9 个词</span>
               </div>
@@ -114,7 +112,8 @@
               <div class="section-title">
                 <div>
                   <p class="eyebrow">GAME 02</p>
-                  <h2>Sector 快问快答</h2>
+                  <h2 id="sectorTitle">Sector 快问快答</h2>
+                  <p class="rule-text">游戏规则：待定</p>
                 </div>
                 <span class="status-pill">答错不扣分</span>
               </div>
@@ -129,7 +128,8 @@
               <div class="section-title">
                 <div>
                   <p class="eyebrow">GAME 03</p>
-                  <h2>新晋升 Panel 真假判断</h2>
+                  <h2 id="panelTitle">新晋升 Panel 真假判断</h2>
+                  <p class="rule-text">游戏规则：判断每条陈述为真或假，全对有额外奖励。</p>
                 </div>
                 <span id="panelPerfect" class="status-pill">全对有额外奖励</span>
               </div>
@@ -144,7 +144,8 @@
               <div class="section-title">
                 <div>
                   <p class="eyebrow">GAME 04</p>
-                  <h2>知识问答大逃杀</h2>
+                  <h2 id="survivalTitle">知识问答大逃杀</h2>
+                  <p class="rule-text">游戏规则：答对可进入下一题，答错将被淘汰。</p>
                 </div>
                 <span id="survivalStatus" class="status-pill">单错淘汰</span>
               </div>
@@ -165,8 +166,23 @@
               </div>
               <div class="admin-grid">
                 <article>
+                  <h3>实时概况</h3>
+                  <div id="adminStats" class="admin-stats"></div>
+                </article>
+                <article>
                   <h3>开放阶段</h3>
                   <div id="adminStageList" class="release-list"></div>
+                </article>
+                <article>
+                  <h3>Bingo 倒计时与提交</h3>
+                  <div class="bingo-timer-control">
+                    <label>
+                      <span>倒计时分钟</span>
+                      <input id="bingoMinutesInput" type="number" min="1" value="3" />
+                    </label>
+                    <button id="startBingoTimerButton" type="button">开始倒计时</button>
+                    <span id="adminBingoTimer" class="result-box"></span>
+                  </div>
                 </article>
                 <article>
                   <h3>Bingo 逐词发布</h3>
@@ -210,12 +226,26 @@
         <p>所有用户会回到注册后的初始界面，答题记录和积分将清零，STAFF 发布状态也会重置。</p>
         <div class="modal-actions">
           <button id="confirmResetButton" class="danger-action" type="button">确定从新开始</button>
+          <button id="clearAllButton" class="danger-outline-action" type="button">全部清空</button>
           <button id="cancelResetButton" type="button">取消</button>
         </div>
       </section>
     </div>
 
+    <div id="registerModal" class="modal-backdrop" hidden>
+      <section class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="registerModalTitle">
+        <p class="eyebrow">CONFIRM</p>
+        <h2 id="registerModalTitle">请确认名字和办公室</h2>
+        <p id="registerConfirmText"></p>
+        <p>确认后无法修改。</p>
+        <div class="modal-actions">
+          <button id="confirmRegisterButton" class="primary-action" type="button">确认进入</button>
+          <button id="cancelRegisterButton" type="button">取消</button>
+        </div>
+      </section>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="./script.js?v=reset-round-20260528-1"></script>
+    <script src="./script.js?v=event-polish-20260528-1"></script>
   </body>
 </html>
