@@ -267,8 +267,12 @@ select:focus {
 }
 
 .admin-mode .content-stack {
-  max-width: 1180px;
+  max-width: 1280px;
   margin: 0 auto;
+}
+
+.admin-mode .panel {
+  padding: clamp(18px, 3vw, 34px);
 }
 
 .content-stack {
@@ -367,6 +371,14 @@ select:focus {
   gap: 18px;
 }
 
+.admin-mode .admin-grid {
+  grid-template-columns: 1fr;
+}
+
+.admin-mode .admin-grid article {
+  min-width: 0;
+}
+
 .word-cloud {
   display: flex;
   flex-wrap: wrap;
@@ -375,8 +387,13 @@ select:focus {
 }
 
 .word-cloud.compact {
-  max-height: 430px;
+  max-height: none;
   overflow: auto;
+}
+
+.admin-mode .word-cloud.compact {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
 }
 
 .word-pill.correct {
@@ -523,7 +540,7 @@ select:focus {
   padding: 10px;
 }
 
-.release-row span {
+.release-row > span {
   min-width: 0;
   color: var(--muted);
   font-size: 13px;
@@ -591,7 +608,21 @@ select:focus {
 }
 
 .stage-switch-row {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(160px, 1fr) auto;
+}
+
+.admin-mode #adminStageList {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.admin-mode .stage-switch-row {
+  min-height: 68px;
+}
+
+.admin-mode .stage-switch-row > span {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 800;
 }
 
 .screen-mode {
