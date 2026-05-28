@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HongShan Cloud Interaction</title>
+    <link rel="stylesheet" href="./styles.css?v=game-20260528" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">HONGSHAN CLOUD</p>
+          <h1>HongShan Cloud Interaction</h1>
+        </div>
+        <div class="user-strip" aria-live="polite">
+          <span id="headerName">未登录</span>
+          <span id="headerRank">排名 --</span>
+        </div>
+      </header>
+
+      <main>
+        <section id="loginView" class="login-view">
+          <div class="hero-copy">
+            <p class="eyebrow">SCAN TO JOIN</p>
+            <h2>扫码入场，积分随玩随存</h2>
+            <p>观众输入姓名即可进入游戏大厅；再次打开会自动恢复个人积分、Bingo 选择和淘汰状态。</p>
+            <form id="joinForm" class="join-form">
+              <label>
+                <span>姓名</span>
+                <input id="nameInput" type="text" autocomplete="name" placeholder="请输入姓名" required />
+              </label>
+              <label>
+                <span>办公室</span>
+                <select id="officeInput" required>
+                  <option value="">请选择办公室</option>
+                  <option value="北京">北京</option>
+                  <option value="上海/武汉">上海/武汉</option>
+                  <option value="香港/深圳/新加坡/东京/伦敦">香港/深圳/新加坡/东京/伦敦</option>
+                </select>
+              </label>
+              <button type="submit">进入游戏</button>
+            </form>
+          </div>
+          <aside class="qr-panel">
+            <img id="qrImage" alt="入场二维码" />
+            <p id="joinUrl"></p>
+          </aside>
+        </section>
+
+        <section id="gameView" class="game-view" hidden>
+          <nav class="side-nav" aria-label="游戏切换">
+            <button class="nav-button active" data-panel="dashboardPanel" type="button">总览</button>
+            <button class="nav-button" data-panel="bingoPanel" type="button">Bingo</button>
+            <button class="nav-button" data-panel="sectorPanel" type="button">快问快答</button>
+            <button class="nav-button" data-panel="panelPanel" type="button">真假判断</button>
+            <button class="nav-button" data-panel="survivalPanel" type="button">知识问答</button>
+          </nav>
+
+          <section class="content-stack">
+            <section id="dashboardPanel" class="panel active-panel">
+              <div class="summary-grid">
+                <article class="metric-card">
+                  <div class="metric-heading">
+                    <span id="metricLabel">已公布总分</span>
+                    <label class="switch-control compact-switch">
+                      <input id="metricToggle" type="checkbox" />
+                      <span></span>
+                    </label>
+                  </div>
+                  <strong id="scoreCard">0</strong>
+                </article>
+                <article>
+                  <span>全场排名</span>
+                  <strong id="rankCard">--</strong>
+                </article>
+                <article>
+                  <span>当前阶段</span>
+                  <strong id="stageCard">Bingo</strong>
+                </article>
+              </div>
+              <div class="leaderboard-card">
+                <div class="section-title">
+                  <h2>大排名</h2>
+                  <button id="resetMeButton" type="button">重新登录</button>
+                </div>
+                <div id="leaderboardList" class="leaderboard-list"></div>
+              </div>
+            </section>
+
+            <section id="bingoPanel" class="panel">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">GAME 01</p>
+                  <h2>老板演讲 Bingo</h2>
+                </div>
+                <span id="bingoStatus" class="status-pill">请选择 9 个词</span>
+              </div>
+              <div class="split-layout">
+                <div>
+                  <h3>30 个候选词</h3>
+                  <div id="bingoWords" class="word-cloud"></div>
+                  <button id="lockBingoButton" class="primary-action" type="button">提交九宫格</button>
+                </div>
+                <div>
+                  <h3>我的九宫格</h3>
+                  <div id="bingoGrid" class="bingo-grid"></div>
+                  <div id="bingoResult" class="result-box"></div>
+                </div>
+              </div>
+            </section>
+
+            <section id="sectorPanel" class="panel">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">GAME 02</p>
+                  <h2>Sector 快问快答</h2>
+                </div>
+                <span class="status-pill">答错不扣分</span>
+              </div>
+              <div id="sectorQuiz" class="quiz-list"></div>
+              <div class="submit-row">
+                <button id="submitSectorButton" class="primary-action" type="button">提交卷面</button>
+                <span id="sectorResult" class="result-box"></span>
+              </div>
+            </section>
+
+            <section id="panelPanel" class="panel">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">GAME 03</p>
+                  <h2>新晋升 Panel 真假判断</h2>
+                </div>
+                <span id="panelPerfect" class="status-pill">全对有额外奖励</span>
+              </div>
+              <div id="panelQuestions" class="quiz-list"></div>
+              <div class="submit-row">
+                <button id="submitPanelButton" class="primary-action" type="button">提交卷面</button>
+                <span id="panelResult" class="result-box"></span>
+              </div>
+            </section>
+
+            <section id="survivalPanel" class="panel">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">GAME 04</p>
+                  <h2>知识问答大逃杀</h2>
+                </div>
+                <span id="survivalStatus" class="status-pill">单错淘汰</span>
+              </div>
+              <div id="survivalQuiz" class="quiz-list"></div>
+              <div class="submit-row">
+                <button id="submitSurvivalButton" class="primary-action" type="button">提交卷面</button>
+                <span id="survivalResult" class="result-box"></span>
+              </div>
+            </section>
+
+            <section id="adminPanel" class="panel">
+              <div class="section-title">
+                <div>
+                  <p class="eyebrow">ADMIN</p>
+                  <h2>现场控场台</h2>
+                </div>
+                <button id="resetAllButton" type="button">清空演示数据</button>
+              </div>
+              <div class="admin-grid">
+                <article>
+                  <h3>开放阶段</h3>
+                  <div id="adminStageList" class="release-list"></div>
+                </article>
+                <article>
+                  <h3>Bingo 逐词发布</h3>
+                  <div id="adminBingoWords" class="word-cloud compact"></div>
+                </article>
+                <article>
+                  <h3>题目放行</h3>
+                  <div id="adminReleaseList" class="release-list"></div>
+                </article>
+              </div>
+            </section>
+
+            <section id="screenPanel" class="panel screen-panel">
+              <div class="screen-stage">
+                <aside class="screen-region">
+                  <p class="eyebrow">OFFICE AVERAGE</p>
+                  <h2>地区实时平均分</h2>
+                  <div id="screenOfficeBars" class="office-bars"></div>
+                </aside>
+                <section class="screen-ranking">
+                  <div class="section-title">
+                    <div>
+                      <p class="eyebrow">LIVE RANKING</p>
+                      <h2>大排名</h2>
+                    </div>
+                    <span id="screenUpdatedAt" class="status-pill"></span>
+                  </div>
+                  <div id="screenLeaderboard" class="leaderboard-list screen-list"></div>
+                </section>
+              </div>
+            </section>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="./script.js?v=game-20260528-2"></script>
+  </body>
+</html>
