@@ -68,12 +68,26 @@ p {
   backdrop-filter: blur(18px);
 }
 
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.brand-lockup img {
+  width: clamp(128px, 19vw, 230px);
+  height: auto;
+  flex: 0 0 auto;
+  display: block;
+}
+
 .eyebrow {
   margin-bottom: 5px;
   color: var(--blue);
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
 }
 
 h1 {
@@ -305,7 +319,7 @@ select:focus {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -339,16 +353,6 @@ select:focus {
   padding: 20px;
 }
 
-.game-instructions {
-  margin-bottom: 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: var(--shadow);
-  padding: 20px;
-}
-
-.game-instructions p,
 .rule-text {
   margin: 8px 0 0;
   color: var(--muted);
@@ -1031,6 +1035,16 @@ select:focus {
 
   .topbar h1 {
     font-size: 30px;
+  }
+
+  .brand-lockup {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .brand-lockup img {
+    width: min(190px, 70vw);
   }
 
   .hero-copy,

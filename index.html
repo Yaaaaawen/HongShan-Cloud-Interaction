@@ -4,14 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HongShan Cloud Interaction</title>
-    <link rel="stylesheet" href="./styles.css?v=mobile-polish-20260529-1" />
+    <link rel="stylesheet" href="./styles.css?v=logo-dashboard-20260529-1" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div>
-          <p class="eyebrow">2026 HONGSHAN CLOUD OFFSITE</p>
-          <h1>HongShan Interactions</h1>
+        <div class="brand-lockup">
+          <img src="./assets/hongshan-logo.png" alt="HongShan 中国" />
+          <div>
+            <p class="eyebrow">2026 HongShan Cloud Offsite</p>
+            <h1>Interactions</h1>
+          </div>
         </div>
         <div class="user-strip" aria-live="polite">
           <span id="headerName">未登录</span>
@@ -53,24 +56,12 @@
 
           <section class="content-stack">
             <section id="dashboardPanel" class="panel active-panel">
-              <section class="game-instructions">
-                <h2>游戏说明</h2>
-                <p>请根据现场开放的游戏和题目作答。提交前可以修改答案，提交后等待现场公布结果。</p>
-              </section>
               <div class="summary-grid">
                 <article class="metric-card">
                   <div class="metric-heading">
-                    <span id="metricLabel">已公布总分</span>
-                    <label class="switch-control compact-switch">
-                      <input id="metricToggle" type="checkbox" />
-                      <span></span>
-                    </label>
+                    <span>已公布总分</span>
                   </div>
                   <strong id="scoreCard">0</strong>
-                </article>
-                <article>
-                  <span>全场排名</span>
-                  <strong id="rankCard">--</strong>
                 </article>
               </div>
               <div class="leaderboard-card">

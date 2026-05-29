@@ -56,7 +56,6 @@ const questionSets = { sector: sectorQuestions, panel: panelQuestions, survival:
 
 const seedPlayers = [];
 
-let metricMode = "score";
 let backendOnline = false;
 let lastServerVersion = 0;
 let isPullingState = false;
@@ -456,10 +455,7 @@ function renderNav() {
 }
 
 function renderDashboard(user) {
-  const stats = correctStats(user);
-  document.getElementById("metricLabel").textContent = metricMode === "score" ? "已公布总分" : "正确率";
-  document.getElementById("scoreCard").textContent = metricMode === "score" ? totalScore(user) : `${stats.rate}%`;
-  document.getElementById("rankCard").textContent = userRank(user.id);
+  document.getElementById("scoreCard").textContent = totalScore(user);
   const list = document.getElementById("leaderboardList");
   list.innerHTML = "";
   rankUsers().forEach((item, index) => {
@@ -904,11 +900,6 @@ document.getElementById("startBingoTimerButton").addEventListener("click", () =>
   const minutes = Math.max(1, Number(document.getElementById("bingoMinutesInput").value || 1));
   state.admin.bingoDeadline = Date.now() + minutes * 60 * 1000;
   saveState();
-  render();
-});
-
-document.getElementById("metricToggle").addEventListener("change", (event) => {
-  metricMode = event.target.checked ? "accuracy" : "score";
   render();
 });
 
