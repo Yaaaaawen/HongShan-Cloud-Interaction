@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HongShan Cloud Interaction</title>
-    <link rel="stylesheet" href="./styles.css?v=event-polish-20260528-1" />
+    <link rel="stylesheet" href="./styles.css?v=mobile-polish-20260529-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -55,7 +55,7 @@
             <section id="dashboardPanel" class="panel active-panel">
               <section class="game-instructions">
                 <h2>游戏说明</h2>
-                <p>请根据 STAFF 现场开放的游戏和题目作答。提交前可以修改答案，提交后等待现场公布结果。</p>
+                <p>请根据现场开放的游戏和题目作答。提交前可以修改答案，提交后等待现场公布结果。</p>
               </section>
               <div class="summary-grid">
                 <article class="metric-card">
@@ -71,10 +71,6 @@
                 <article>
                   <span>全场排名</span>
                   <strong id="rankCard">--</strong>
-                </article>
-                <article>
-                  <span>当前阶段</span>
-                  <strong id="stageCard">Bingo</strong>
                 </article>
               </div>
               <div class="leaderboard-card">
@@ -228,7 +224,7 @@
       <section class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="resetModalTitle">
         <p class="eyebrow">DANGER ZONE</p>
         <h2 id="resetModalTitle">确定重新开始？</h2>
-        <p>所有用户会回到注册后的初始界面，答题记录和积分将清零，STAFF 发布状态也会重置。</p>
+        <p>所有用户会回到注册后的初始界面，答题记录、积分和发布状态都会重置。</p>
         <div class="modal-actions">
           <button id="confirmResetButton" class="danger-action" type="button">确定从新开始</button>
           <button id="clearAllButton" class="danger-outline-action" type="button">全部清空</button>

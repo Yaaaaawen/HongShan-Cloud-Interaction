@@ -460,8 +460,6 @@ function renderDashboard(user) {
   document.getElementById("metricLabel").textContent = metricMode === "score" ? "已公布总分" : "正确率";
   document.getElementById("scoreCard").textContent = metricMode === "score" ? totalScore(user) : `${stats.rate}%`;
   document.getElementById("rankCard").textContent = userRank(user.id);
-  document.getElementById("stageCard").textContent =
-    Object.entries(gameMeta).filter(([game]) => isGameAvailable(game)).map(([, meta]) => meta.label).join(" / ") || "未开放";
   const list = document.getElementById("leaderboardList");
   list.innerHTML = "";
   rankUsers().forEach((item, index) => {
@@ -514,7 +512,7 @@ function isBingoExpired() {
 }
 
 function bingoCountdownText() {
-  if (!state.admin.bingoDeadline) return "等待 STAFF 开始倒计时";
+  if (!state.admin.bingoDeadline) return "等待开始倒计时";
   const remain = Math.max(0, Number(state.admin.bingoDeadline) - Date.now());
   const minutes = String(Math.floor(remain / 60000)).padStart(2, "0");
   const seconds = String(Math.floor((remain % 60000) / 1000)).padStart(2, "0");
@@ -624,7 +622,7 @@ function renderSubmitState(game, questions) {
   result.textContent = submittedCount > 0
     ? hasVisibleAnswer
       ? `已公布得分：${getQuizScore(user, game)}`
-      : "已提交，等待 STAFF 公布答案"
+      : "已提交，等待公布答案"
     : "";
   if (game === "panel" && submittedCount === panelQuestions.length && visibleAnswerCount(game, panelQuestions) === panelQuestions.length && getQuizScore(user, game) === 100) {
     result.textContent = "本环节得分：100（含全对奖励）";

@@ -617,6 +617,10 @@ select:focus {
   font-weight: 800;
 }
 
+.result-box:empty {
+  display: none;
+}
+
 .release-list {
   display: grid;
   gap: 8px;
@@ -994,10 +998,17 @@ select:focus {
 
   .side-nav {
     position: static;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
+    gap: 8px;
+    margin: -4px -14px 4px;
+    overflow-x: auto;
+    padding: 4px 14px 8px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .nav-button {
+    flex: 0 0 auto;
+    min-width: 88px;
     padding-inline: 8px;
     font-size: 13px;
   }
@@ -1005,5 +1016,41 @@ select:focus {
   .user-strip {
     width: 100%;
     justify-content: space-between;
+  }
+}
+
+@media (max-width: 520px) {
+  main {
+    padding: 14px 10px 36px;
+  }
+
+  .topbar {
+    position: static;
+    padding: 12px 10px;
+  }
+
+  .topbar h1 {
+    font-size: 30px;
+  }
+
+  .hero-copy,
+  .panel,
+  .leaderboard-card,
+  .summary-grid article {
+    padding: 16px;
+  }
+
+  .candidate-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .countdown-pill {
+    width: 100%;
+  }
+
+  .word-pill,
+  .answer-button {
+    min-height: 44px;
   }
 }
