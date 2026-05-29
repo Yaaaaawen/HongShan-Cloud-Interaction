@@ -421,6 +421,19 @@ select:focus {
   margin-bottom: 16px;
 }
 
+.bingo-submit-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quiet-hint {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .candidate-heading {
   display: flex;
   align-items: center;
@@ -746,15 +759,36 @@ select:focus {
 
 .admin-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 10px;
 }
 
-.admin-stat-card {
+.admin-stat-group {
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
+  background: #fff;
+}
+
+.admin-stat-group h4 {
+  border-bottom: 1px solid var(--line);
+  background: #f3f7ff;
+  padding: 10px 12px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.admin-stat-subgrid {
+  display: grid;
+}
+
+.admin-stat-card {
   background: #f9fbff;
   padding: 14px;
+}
+
+.admin-stat-subgrid .admin-stat-card + .admin-stat-card {
+  border-left: 1px solid var(--line);
 }
 
 .admin-stat-card span {

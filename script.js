@@ -488,18 +488,12 @@ function renderBingo() {
     grid.append(cell);
   }
 
-  const hitCount = user.bingo.selected.filter((word) => state.admin.bingoRevealed[word]).length;
-  status.classList.toggle("urgent", isBingoUrgent());
-  status.textContent = user.bingo.submitted
-    ? `已提交，后台已发布 ${hitCount}/9`
-    : expired
-      ? "倒计时已结束，提交无效"
-      : `${bingoCountdownText()} · 已选择 ${user.bingo.selected.length}/9`;
+  updateBingoCountdownDisplays();
   document.getElementById("lockBingoButton").disabled =
     user.bingo.submitted || user.bingo.selected.length !== 9 || !isGameAvailable("bingo") || state.admin.gameEnded.bingo || expired;
   document.getElementById("bingoResult").textContent = user.bingo.submitted
     ? `Bingo 已公布积分：${getBingoScore(user)}`
-    : "提交后等待 STAFF 逐词发布积分";
+    : "";
 }
 
 function isBingoExpired() {
@@ -518,6 +512,34 @@ function isBingoUrgent() {
   if (!state.admin.bingoDeadline) return false;
   const remain = Math.max(0, Number(state.admin.bingoDeadline) - Date.now());
   return remain > 0 && remain <= 10000;
+}
+
+function bingoStatusText(user) {
+  const expired = isBingoExpired();
+  if (expired) return user.bingo.submitted ? "倒计时已结束" : "倒计时已结束，提交无效";
+  if (user.bingo.submitted) {
+    const hitCount = user.bingo.selected.filter((word) => state.admin.bingoRevealed[word]).length;
+    return `已提交，后台已发布 ${hitCount}/9`;
+  }
+  return `${bingoCountdownText()} · 已选择 ${user.bingo.selected.length}/9`;
+}
+
+function updateBingoCountdownDisplays() {
+  const status = document.getElementById("bingoStatus");
+  const user = getCurrentUser();
+  if (status && user) {
+    status.classList.toggle("urgent", isBingoUrgent());
+    status.textContent = bingoStatusText(user);
+  }
+  const adminTimer = document.getElementById("adminBingoTimer");
+  if (adminTimer) adminTimer.textContent = bingoCountdownText();
+  if (!user || !document.getElementById("bingoPanel")?.classList.contains("active-panel")) return;
+  const expired = isBingoExpired();
+  document.querySelectorAll("#bingoWords .word-pill").forEach((button) => {
+    button.disabled = user.bingo.submitted || !isGameAvailable("bingo") || state.admin.gameEnded.bingo || expired;
+  });
+  document.getElementById("lockBingoButton").disabled =
+    user.bingo.submitted || user.bingo.selected.length !== 9 || !isGameAvailable("bingo") || state.admin.gameEnded.bingo || expired;
 }
 
 function bingoLines(user) {
@@ -704,21 +726,33 @@ function renderAdmin() {
 function renderAdminStats(statsBox) {
   const realUsers = state.users.filter(isActiveUser);
   const survival = survivalProgressStats(realUsers);
-  const stats = [
-    ["实时注册人数", realUsers.length],
-    ["Bingo 提交人数", realUsers.filter((user) => user.bingo.submitted).length],
-    ["快问快答提交人数", submittedUserCount("sector")],
-    ["真假判断提交人数", submittedUserCount("panel")],
-    ["知识问答答对人数", survival.correct],
-    ["知识问答淘汰人数", survival.eliminated],
-    ["知识问答未提交人数", survival.pending]
-  ];
-  stats.forEach(([label, value]) => {
-    const card = document.createElement("div");
-    card.className = "admin-stat-card";
-    card.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
-    statsBox.append(card);
+  const bingoSubmitted = realUsers.filter((user) => user.bingo.submitted).length;
+  const sectorSubmitted = submittedUserCount("sector");
+  const panelSubmitted = submittedUserCount("panel");
+  statsBox.append(
+    adminStatGroup("实时注册", [["注册人数", realUsers.length]]),
+    adminStatGroup("游戏一 Bingo", [["成功提交", bingoSubmitted], ["未提交", realUsers.length - bingoSubmitted]]),
+    adminStatGroup("游戏二 快问快答", [["成功提交", sectorSubmitted], ["未提交", realUsers.length - sectorSubmitted]]),
+    adminStatGroup("游戏三 真假判断", [["成功提交", panelSubmitted], ["未提交", realUsers.length - panelSubmitted]]),
+    adminStatGroup("游戏四 知识问答", [["答对人数", survival.correct], ["淘汰人数", survival.eliminated], ["未提交人数", survival.pending]])
+  );
+}
+
+function adminStatGroup(title, items) {
+  const card = document.createElement("div");
+  card.className = "admin-stat-group";
+  card.innerHTML = `<h4>${title}</h4>`;
+  const grid = document.createElement("div");
+  grid.className = "admin-stat-subgrid";
+  grid.style.gridTemplateColumns = `repeat(${items.length}, minmax(0, 1fr))`;
+  items.forEach(([label, value]) => {
+    const item = document.createElement("div");
+    item.className = "admin-stat-card";
+    item.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
+    grid.append(item);
   });
+  card.append(grid);
+  return card;
 }
 
 function submittedAnswerCount(game) {
@@ -868,8 +902,14 @@ window.addEventListener("storage", () => {
 
 window.setInterval(() => {
   if (isScreenMode) renderScreen();
-  if (isAdminMode || document.getElementById("bingoPanel")?.classList.contains("active-panel")) render();
+  if (isAdminMode) render();
 }, 3000);
+
+window.setInterval(() => {
+  if (isAdminMode || document.getElementById("bingoPanel")?.classList.contains("active-panel")) {
+    updateBingoCountdownDisplays();
+  }
+}, 250);
 
 window.setInterval(() => {
   pullState();
