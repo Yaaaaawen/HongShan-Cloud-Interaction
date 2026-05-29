@@ -421,6 +421,39 @@ select:focus {
   margin-bottom: 16px;
 }
 
+.candidate-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.candidate-heading h3 {
+  margin: 0;
+}
+
+.countdown-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: 8px;
+  background: #eaf1ff;
+  color: var(--blue);
+  padding: 7px 12px;
+  font-size: 14px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.countdown-pill.urgent {
+  border-color: rgba(207, 63, 63, 0.38);
+  background: #fff0f0;
+  color: var(--red);
+}
+
 .word-cloud.compact {
   max-height: none;
   overflow: auto;
@@ -533,6 +566,12 @@ select:focus {
   color: var(--red);
 }
 
+.answer-button.selected.incorrect {
+  border-color: rgba(207, 63, 63, 0.65);
+  background: #fff0f0;
+  color: var(--red);
+}
+
 .submit-row {
   display: flex;
   flex-wrap: wrap;
@@ -546,6 +585,11 @@ select:focus {
 .word-pill:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.answer-button.correct:disabled,
+.answer-button.incorrect:disabled {
+  opacity: 1;
 }
 
 .result-box {
@@ -757,6 +801,12 @@ select:focus {
   color: var(--green);
   font-size: 12px;
   font-weight: 800;
+}
+
+.admin-question-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .admin-mode #adminStageList {

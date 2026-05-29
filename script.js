@@ -138,7 +138,7 @@ function normalizeAdmin(admin = {}) {
     roundId: admin.roundId || "main",
     gameOpen: { bingo: true, sector: false, panel: false, survival: false, ...(admin.gameOpen || {}) },
     gameEnded: { bingo: false, sector: false, panel: false, survival: false, ...(admin.gameEnded || {}) },
-    answersVisible: { sector: false, panel: false, survival: false, ...(admin.answersVisible || {}) },
+    answersVisible: normalizeAnswersVisible(admin.answersVisible),
     bingoDeadline: admin.bingoDeadline || null,
     bingoRevealed: { ...Object.fromEntries(bingoCandidates.map((word) => [word, false])), ...(admin.bingoRevealed || {}) },
     released: {
@@ -146,6 +146,17 @@ function normalizeAdmin(admin = {}) {
       ...(admin.released || {})
     }
   };
+}
+
+function normalizeAnswersVisible(answersVisible = {}) {
+  const next = {};
+  Object.entries(questionSets).forEach(([game, questions]) => {
+    next[game] = {};
+    questions.forEach((question) => {
+      next[game][question.id] = answersVisible?.[game] === true || Boolean(answersVisible?.[game]?.[question.id]);
+    });
+  });
+  return next;
 }
 
 function resetUserForNewRound(user) {
@@ -225,6 +236,7 @@ function getQuizScore(user, game) {
   questions.forEach((question) => {
     const choice = submitted.answers?.[question.id];
     if (!choice) return;
+    if (!isQuestionAnswerVisible(game, question.id)) return;
     const correct = choice === question.answer;
     if (game === "survival") {
       if (alive && correct) score += question.points;
@@ -233,7 +245,7 @@ function getQuizScore(user, game) {
     }
     if (correct) score += question.points;
   });
-  if (game === "panel" && questions.every((question) => submitted.answers?.[question.id] === question.answer)) {
+  if (game === "panel" && questions.every((question) => isQuestionAnswerVisible(game, question.id) && submitted.answers?.[question.id] === question.answer)) {
     score += 10;
   }
   return score;
@@ -251,6 +263,7 @@ function correctStats(user) {
     const answers = user.submissions[game]?.answers || {};
     questions.forEach((question) => {
       if (!answers[question.id]) return;
+      if (!isQuestionAnswerVisible(game, question.id)) return;
       total += 1;
       if (answers[question.id] === question.answer) correct += 1;
     });
@@ -272,6 +285,14 @@ function userRank(userId) {
 
 function isReleased(questionId) {
   return Boolean(state.admin.released[questionId]);
+}
+
+function isQuestionAnswerVisible(game, questionId) {
+  return Boolean(state.admin.answersVisible?.[game]?.[questionId]);
+}
+
+function visibleAnswerCount(game, questions = questionSets[game]) {
+  return questions.filter((question) => isQuestionAnswerVisible(game, question.id)).length;
 }
 
 function visibleQuestions(game) {
@@ -468,6 +489,7 @@ function renderBingo() {
   }
 
   const hitCount = user.bingo.selected.filter((word) => state.admin.bingoRevealed[word]).length;
+  status.classList.toggle("urgent", isBingoUrgent());
   status.textContent = user.bingo.submitted
     ? `已提交，后台已发布 ${hitCount}/9`
     : expired
@@ -490,6 +512,12 @@ function bingoCountdownText() {
   const minutes = String(Math.floor(remain / 60000)).padStart(2, "0");
   const seconds = String(Math.floor((remain % 60000) / 1000)).padStart(2, "0");
   return `剩余 ${minutes}:${seconds}`;
+}
+
+function isBingoUrgent() {
+  if (!state.admin.bingoDeadline) return false;
+  const remain = Math.max(0, Number(state.admin.bingoDeadline) - Date.now());
+  return remain > 0 && remain <= 10000;
 }
 
 function bingoLines(user) {
@@ -518,6 +546,7 @@ function renderQuiz(containerId, game, questions) {
   releasedQuestions.forEach((question) => {
     const questionSubmitted = Boolean(submitted?.answers?.[question.id]);
     const choice = submitted?.answers?.[question.id] || user.drafts[question.id];
+    const answerShown = isQuestionAnswerVisible(game, question.id);
     const card = document.createElement("article");
     card.className = "question-card";
     card.classList.toggle("locked", game === "survival" && !user.survivalAlive && !questionSubmitted);
@@ -532,15 +561,14 @@ function renderQuiz(containerId, game, questions) {
       button.type = "button";
       button.className = "answer-button";
       button.textContent = option;
-      button.disabled = questionSubmitted || !isGameAvailable(game) || state.admin.gameEnded[game] || (game === "survival" && !user.survivalAlive);
-      button.classList.toggle("selected", choice === option && !questionSubmitted);
-      if (state.admin.answersVisible[game] && option === question.answer) button.classList.add("correct");
+      button.disabled = questionSubmitted || answerShown || !isGameAvailable(game) || state.admin.gameEnded[game] || (game === "survival" && !user.survivalAlive);
+      button.classList.toggle("selected", choice === option);
+      if (answerShown && option === question.answer) button.classList.add("correct");
+      if (answerShown && choice === option && option !== question.answer) button.classList.add("incorrect");
       button.addEventListener("click", () => setDraftAnswer(game, question.id, option));
       row.append(button);
     });
-    if (questionSubmitted) row.append(note("已提交"));
-    if (!questionSubmitted && choice) row.append(note("已选择，可修改"));
-    if (state.admin.answersVisible[game]) row.append(note(`答案：${question.answer}`));
+    if (answerShown) row.append(note(`答案：${question.answer}`));
     container.append(card);
   });
   renderSubmitState(game, releasedQuestions);
@@ -555,21 +583,22 @@ function renderSubmitState(game, questions) {
   const ready = pendingQuestions.length > 0 && pendingQuestions.every((question) => user.drafts[question.id]);
   button.disabled = !ready || !isGameAvailable(game) || state.admin.gameEnded[game] || (game === "survival" && !user.survivalAlive);
   const submittedCount = questions.length - pendingQuestions.length;
+  const hasVisibleAnswer = visibleAnswerCount(game, questions) > 0;
   result.textContent = submittedCount > 0
-    ? `已提交 ${submittedCount}/${questions.length} 题，本环节得分：${getQuizScore(user, game)}`
-    : ready
-      ? "已选完，可提交"
-      : "选择答案后可提交，提交前都能修改";
-  if (game === "panel" && submittedCount === panelQuestions.length && getQuizScore(user, game) === 100) {
+    ? hasVisibleAnswer
+      ? `已公布得分：${getQuizScore(user, game)}`
+      : "已提交，等待 STAFF 公布答案"
+    : "";
+  if (game === "panel" && submittedCount === panelQuestions.length && visibleAnswerCount(game, panelQuestions) === panelQuestions.length && getQuizScore(user, game) === 100) {
     result.textContent = "本环节得分：100（含全对奖励）";
   }
   if (game === "panel") {
     document.getElementById("panelPerfect").textContent =
-      submittedCount === panelQuestions.length && getQuizScore(user, game) === 100
+      submittedCount === panelQuestions.length && visibleAnswerCount(game, panelQuestions) === panelQuestions.length && getQuizScore(user, game) === 100
         ? "6 题全对，奖励已发放"
         : "全对有额外奖励";
   }
-  if (game === "survival" && submittedCount > 0 && !user.survivalAlive) {
+  if (game === "survival" && submittedCount > 0 && !user.survivalAlive && hasVisibleAnswer) {
     result.textContent = `本环节得分：${getQuizScore(user, game)}，已淘汰`;
   }
   if (game === "survival") {
@@ -641,20 +670,13 @@ function renderAdmin() {
     const heading = document.createElement("div");
     heading.className = "admin-group-heading";
     heading.innerHTML = `<h3>${gameMeta[game].label}</h3>`;
-    const revealButton = document.createElement("button");
-    revealButton.type = "button";
-    revealButton.textContent = state.admin.answersVisible[game] ? "隐藏答案" : "公布答案";
-    revealButton.addEventListener("click", () => {
-      state.admin.answersVisible[game] = !state.admin.answersVisible[game];
-      saveState();
-      render();
-    });
-    heading.append(revealButton);
     group.append(heading);
     questions.forEach((question) => {
       const row = document.createElement("div");
       row.className = "release-row";
       row.innerHTML = `<span>${question.group} · ${question.text}<br><span class="answer-reveal">答案：${question.answer}</span></span>`;
+      const controls = document.createElement("div");
+      controls.className = "admin-question-actions";
       const button = document.createElement("button");
       button.type = "button";
       button.textContent = isReleased(question.id) ? "已放行" : "放行";
@@ -663,7 +685,16 @@ function renderAdmin() {
         saveState();
         render();
       });
-      row.append(button);
+      const revealButton = document.createElement("button");
+      revealButton.type = "button";
+      revealButton.textContent = isQuestionAnswerVisible(game, question.id) ? "隐藏答案" : "公布答案";
+      revealButton.addEventListener("click", () => {
+        state.admin.answersVisible[game][question.id] = !state.admin.answersVisible[game][question.id];
+        saveState();
+        render();
+      });
+      controls.append(button, revealButton);
+      row.append(controls);
       group.append(row);
     });
     releaseBox.append(group);
@@ -672,12 +703,15 @@ function renderAdmin() {
 
 function renderAdminStats(statsBox) {
   const realUsers = state.users.filter(isActiveUser);
+  const survival = survivalProgressStats(realUsers);
   const stats = [
     ["实时注册人数", realUsers.length],
     ["Bingo 提交人数", realUsers.filter((user) => user.bingo.submitted).length],
-    ["快问快答提交", submittedAnswerCount("sector")],
-    ["真假判断提交", submittedAnswerCount("panel")],
-    ["知识问答提交", submittedAnswerCount("survival")]
+    ["快问快答提交人数", submittedUserCount("sector")],
+    ["真假判断提交人数", submittedUserCount("panel")],
+    ["知识问答答对人数", survival.correct],
+    ["知识问答淘汰人数", survival.eliminated],
+    ["知识问答未提交人数", survival.pending]
   ];
   stats.forEach(([label, value]) => {
     const card = document.createElement("div");
@@ -689,6 +723,25 @@ function renderAdminStats(statsBox) {
 
 function submittedAnswerCount(game) {
   return state.users.filter(isActiveUser).reduce((sum, user) => sum + Object.keys(user.submissions[game]?.answers || {}).length, 0);
+}
+
+function submittedUserCount(game) {
+  return state.users.filter((user) => isActiveUser(user) && Object.keys(user.submissions[game]?.answers || {}).length > 0).length;
+}
+
+function survivalProgressStats(users) {
+  return users.reduce((stats, user) => {
+    const answers = user.submissions.survival?.answers || {};
+    const count = Object.keys(answers).length;
+    if (!count) {
+      stats.pending += 1;
+    } else if (user.survivalAlive) {
+      stats.correct += 1;
+    } else {
+      stats.eliminated += 1;
+    }
+    return stats;
+  }, { correct: 0, eliminated: 0, pending: 0 });
 }
 
 function renderQr() {

@@ -42,7 +42,11 @@ function defaultState() {
       roundId: "main",
       gameOpen: { bingo: true, sector: false, panel: false, survival: false },
       gameEnded: { bingo: false, sector: false, panel: false, survival: false },
-      answersVisible: { sector: false, panel: false, survival: false },
+      answersVisible: {
+        sector: {},
+        panel: {},
+        survival: {}
+      },
       bingoDeadline: null,
       bingoRevealed: Object.fromEntries(bingoCandidates.map((word) => [word, false])),
       released: Object.fromEntries(questionIds.map((id) => [id, false]))

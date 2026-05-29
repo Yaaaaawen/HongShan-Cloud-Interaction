@@ -92,11 +92,13 @@
                   <h2 id="bingoTitle">老板演讲 Bingo</h2>
                   <p class="rule-text">游戏规则：选择 9 个词组成九宫格，全对有额外奖励。倒计时结束后提交无效。</p>
                 </div>
-                <span id="bingoStatus" class="status-pill">请选择 9 个词</span>
               </div>
               <div class="split-layout">
                 <div>
-                  <h3>30 个候选词</h3>
+                  <div class="candidate-heading">
+                    <h3>30 个候选词</h3>
+                    <span id="bingoStatus" class="countdown-pill">请选择 9 个词</span>
+                  </div>
                   <div id="bingoWords" class="word-cloud"></div>
                   <button id="lockBingoButton" class="primary-action" type="button">提交九宫格</button>
                 </div>

@@ -59,7 +59,7 @@ values (
     "roundId": "main",
     "gameOpen": { "bingo": true, "sector": false, "panel": false, "survival": false },
     "gameEnded": { "bingo": false, "sector": false, "panel": false, "survival": false },
-    "answersVisible": { "sector": false, "panel": false, "survival": false },
+    "answersVisible": { "sector": {}, "panel": {}, "survival": {} },
     "bingoDeadline": null,
     "bingoRevealed": {
       "增长": false, "客户": false, "协同": false, "创新": false, "AI": false,
