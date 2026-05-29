@@ -299,6 +299,22 @@ function visibleQuestions(game) {
   return questionSets[game].filter((question) => isReleased(question.id));
 }
 
+function hasVisibleSurvivalMistake(user) {
+  const answers = user.submissions.survival?.answers || {};
+  return survivalQuestions.some((question) =>
+    isQuestionAnswerVisible("survival", question.id) && answers[question.id] && answers[question.id] !== question.answer
+  );
+}
+
+function isPublicSurvivalAlive(user) {
+  return !hasVisibleSurvivalMistake(user);
+}
+
+function currentSurvivalQuestion() {
+  const released = visibleQuestions("survival");
+  return released[released.length - 1] || null;
+}
+
 function isGameAvailable(game) {
   return Boolean(state.admin.gameOpen[game]);
 }
@@ -346,9 +362,6 @@ function submitGame(game) {
   questions.forEach((question) => {
     user.submissions[game].answers[question.id] = user.drafts[question.id];
   });
-  if (game === "survival") {
-    user.survivalAlive = user.survivalAlive && questions.every((question) => user.drafts[question.id] === question.answer);
-  }
   saveState();
   render();
 }
@@ -569,9 +582,10 @@ function renderQuiz(containerId, game, questions) {
     const questionSubmitted = Boolean(submitted?.answers?.[question.id]);
     const choice = submitted?.answers?.[question.id] || user.drafts[question.id];
     const answerShown = isQuestionAnswerVisible(game, question.id);
+    const survivalAlive = game !== "survival" || isPublicSurvivalAlive(user);
     const card = document.createElement("article");
     card.className = "question-card";
-    card.classList.toggle("locked", game === "survival" && !user.survivalAlive && !questionSubmitted);
+    card.classList.toggle("locked", game === "survival" && !survivalAlive && !questionSubmitted);
     card.innerHTML = `
       <div class="question-meta"><span>${question.group}</span><span>${question.points} 分</span></div>
       <p>${question.text}</p>
@@ -583,7 +597,7 @@ function renderQuiz(containerId, game, questions) {
       button.type = "button";
       button.className = "answer-button";
       button.textContent = option;
-      button.disabled = questionSubmitted || answerShown || !isGameAvailable(game) || state.admin.gameEnded[game] || (game === "survival" && !user.survivalAlive);
+      button.disabled = questionSubmitted || answerShown || !isGameAvailable(game) || state.admin.gameEnded[game] || (game === "survival" && !survivalAlive);
       button.classList.toggle("selected", choice === option);
       if (answerShown && option === question.answer) button.classList.add("correct");
       if (answerShown && choice === option && option !== question.answer) button.classList.add("incorrect");
@@ -603,7 +617,8 @@ function renderSubmitState(game, questions) {
   const submitted = user.submissions[game];
   const pendingQuestions = questions.filter((question) => !submitted?.answers?.[question.id]);
   const ready = pendingQuestions.length > 0 && pendingQuestions.every((question) => user.drafts[question.id]);
-  button.disabled = !ready || !isGameAvailable(game) || state.admin.gameEnded[game] || (game === "survival" && !user.survivalAlive);
+  const survivalAlive = game !== "survival" || isPublicSurvivalAlive(user);
+  button.disabled = !ready || !isGameAvailable(game) || state.admin.gameEnded[game] || (game === "survival" && !survivalAlive);
   const submittedCount = questions.length - pendingQuestions.length;
   const hasVisibleAnswer = visibleAnswerCount(game, questions) > 0;
   result.textContent = submittedCount > 0
@@ -620,11 +635,11 @@ function renderSubmitState(game, questions) {
         ? "6 题全对，奖励已发放"
         : "全对有额外奖励";
   }
-  if (game === "survival" && submittedCount > 0 && !user.survivalAlive && hasVisibleAnswer) {
+  if (game === "survival" && submittedCount > 0 && hasVisibleSurvivalMistake(user) && hasVisibleAnswer) {
     result.textContent = `本环节得分：${getQuizScore(user, game)}，已淘汰`;
   }
   if (game === "survival") {
-    document.getElementById("survivalStatus").textContent = user.survivalAlive ? "单错淘汰" : "已淘汰";
+    document.getElementById("survivalStatus").textContent = hasVisibleSurvivalMistake(user) ? "已淘汰" : "单错淘汰";
   }
 }
 
@@ -734,7 +749,7 @@ function renderAdminStats(statsBox) {
     adminStatGroup("游戏一 Bingo", [["成功提交", bingoSubmitted], ["未提交", realUsers.length - bingoSubmitted]]),
     adminStatGroup("游戏二 快问快答", [["成功提交", sectorSubmitted], ["未提交", realUsers.length - sectorSubmitted]]),
     adminStatGroup("游戏三 真假判断", [["成功提交", panelSubmitted], ["未提交", realUsers.length - panelSubmitted]]),
-    adminStatGroup("游戏四 知识问答", [["答对人数", survival.correct], ["淘汰人数", survival.eliminated], ["未提交人数", survival.pending]])
+    adminStatGroup("游戏四 知识问答", [["答对人数", survival.correct], ["淘汰人数", survival.eliminated], ["当前题目未提交人数", survival.pending]])
   );
 }
 
@@ -764,15 +779,15 @@ function submittedUserCount(game) {
 }
 
 function survivalProgressStats(users) {
+  const currentQuestion = currentSurvivalQuestion();
   return users.reduce((stats, user) => {
     const answers = user.submissions.survival?.answers || {};
-    const count = Object.keys(answers).length;
-    if (!count) {
-      stats.pending += 1;
-    } else if (user.survivalAlive) {
-      stats.correct += 1;
-    } else {
+    if (hasVisibleSurvivalMistake(user)) {
       stats.eliminated += 1;
+    } else if (currentQuestion && answers[currentQuestion.id] === currentQuestion.answer && isQuestionAnswerVisible("survival", currentQuestion.id)) {
+      stats.correct += 1;
+    } else if (currentQuestion && !answers[currentQuestion.id]) {
+      stats.pending += 1;
     }
     return stats;
   }, { correct: 0, eliminated: 0, pending: 0 });
@@ -807,7 +822,6 @@ function officeAverages() {
 function renderScreen() {
   const bars = document.getElementById("screenOfficeBars");
   const list = document.getElementById("screenLeaderboard");
-  const updated = document.getElementById("screenUpdatedAt");
   bars.innerHTML = "";
   list.innerHTML = "";
   const averages = officeAverages();
@@ -822,6 +836,12 @@ function renderScreen() {
     bars.append(bar);
   });
   rankUsers().slice(0, 12).forEach((user, index) => list.append(leaderboardRow(user, index)));
+  updateScreenClock();
+}
+
+function updateScreenClock() {
+  const updated = document.getElementById("screenUpdatedAt");
+  if (!updated) return;
   updated.textContent = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
@@ -909,10 +929,12 @@ window.setInterval(() => {
   if (isAdminMode || document.getElementById("bingoPanel")?.classList.contains("active-panel")) {
     updateBingoCountdownDisplays();
   }
+  if (isScreenMode) updateScreenClock();
 }, 250);
 
 window.setInterval(() => {
   pullState();
+  pullCloudState();
 }, 1000);
 
 async function pullState() {
@@ -986,7 +1008,9 @@ function stateSignature(nextState) {
 
 async function pullCloudState() {
   if (!cloudReady || cloudPulling) return;
-  if (Date.now() < localWriteUntil) return;
+  if (isAdminMode && Date.now() < localWriteUntil) return;
+  const shouldProtectCurrentUser = !isAdminMode && currentUserId && Date.now() < localWriteUntil;
+  const protectedUser = shouldProtectCurrentUser ? getCurrentUser() : null;
   cloudPulling = true;
   try {
     const [{ data: adminRows, error: adminError }, { data: userRows, error: usersError }] = await Promise.all([
@@ -998,6 +1022,14 @@ async function pullCloudState() {
       admin: adminRows?.[0]?.admin || state.admin,
       users: userRows?.length ? userRows.map((row) => row.payload) : state.users
     });
+    if (protectedUser) {
+      const userIndex = nextState.users.findIndex((user) => user.id === currentUserId);
+      if (userIndex >= 0) {
+        nextState.users[userIndex] = protectedUser;
+      } else {
+        nextState.users.push(protectedUser);
+      }
+    }
     const signature = stateSignature(nextState);
     if (signature !== cloudSignature) {
       cloudSignature = signature;
